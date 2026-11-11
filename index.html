@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sudoku Clash — Real-time Multiplayer Tournament</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          colors: {
+            brand: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body { background-color: #0b0f19; color: #f3f4f6; }
+    .sudoku-cell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      transition: background-color 0.15s ease;
+    }
+    .thick-right { border-right: 2.5px solid #64748b !important; }
+    .thick-bottom { border-bottom: 2.5px solid #64748b !important; }
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      padding: 1px;
+    }
+    .notes-grid span {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      line-height: 1;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between font-sans selection:bg-indigo-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="w-full max-w-4xl px-4 py-3 border-b border-slate-800/80 flex items-center justify-between">
+    <div class="flex items-center space-x-2">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center font-black text-white text-base shadow-lg shadow-indigo-500/20">S</div>
+      <span class="font-bold tracking-tight text-lg text-white">Sudoku<span class="text-indigo-400">Clash</span></span>
+    </div>
+    <div id="room-badge" class="hidden items-center space-x-2 bg-slate-900 border border-slate-700/60 px-3 py-1 rounded-full text-xs font-mono text-slate-300">
+      <span>ROOM:</span>
+      <span id="badge-room-code" class="text-indigo-400 font-bold">------</span>
+      <button onclick="copyInviteLink()" class="ml-1 text-slate-400 hover:text-white" title="Copy share link">📋</button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="w-full max-w-4xl p-4 flex-1 flex flex-col items-center justify-center">
+
+    <!-- SCREEN 1: LOBBY -->
+    <div id="lobby-screen" class="w-full max-w-md bg-slate-900/80 backdrop-blur-md border border-slate-800 p-6 sm:p-8 rounded-2xl shadow-2xl">
+      <div class="text-center mb-6">
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Sudoku Showdown</h1>
+        <p class="text-sm text-slate-400 mt-1">Real-time synchronized battle for siblings & friends</p>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-400 tracking-wider mb-1">Your Name</label>
+          <input type="text" id="player-name-input" maxlength="14" placeholder="Enter your nickname..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <button onclick="setupAsHost()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-600/30 transition flex flex-col items-center justify-center">
+            <span class="text-base font-bold">Host Match</span>
+            <span class="text-[11px] text-indigo-200 font-normal">Create new room</span>
+          </button>
+          <button onclick="showJoinInput()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 px-4 rounded-xl border border-slate-700 transition flex flex-col items-center justify-center">
+            <span class="text-base font-bold">Join Game</span>
+            <span class="text-[11px] text-slate-400 font-normal">Enter room code</span>
+          </button>
+        </div>
+
+        <!-- Join Form Section -->
+        <div id="join-section" class="hidden pt-4 border-t border-slate-800 space-y-3">
+          <label class="block text-xs font-semibold uppercase text-slate-400 tracking-wider mb-1">Enter Room Code</label>
+          <div class="flex space-x-2">
+            <input type="text" id="join-room-code" uppercase maxlength="6" placeholder="e.g. 8K2M19" class="w-full uppercase font-mono tracking-wider bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            <button onclick="joinGame()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl transition">Connect</button>
+          </div>
+        </div>
+
+        <!-- Host Waiting Modal -->
+        <div id="host-waiting-section" class="hidden pt-4 border-t border-slate-800 text-center space-y-3">
+          <p class="text-xs text-slate-400">Share this Room Code with your sibling:</p>
+          <div class="inline-flex items-center space-x-2 bg-slate-950 border border-indigo-500/40 px-4 py-2 rounded-xl">
+            <span id="display-room-code" class="text-2xl font-mono font-black text-indigo-400 tracking-widest">------</span>
+            <button onclick="copyInviteLink()" class="p-1 hover:bg-slate-800 rounded text-slate-300" title="Copy URL">📋</button>
+          </div>
+          <p class="text-xs text-amber-400/90 animate-pulse font-mono">Waiting for second player to connect...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN 2: GAMEPLAY -->
+    <div id="game-screen" class="hidden w-full flex flex-col items-center">
+
+      <!-- TOURNAMENT BANNER -->
+      <div class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 mb-4 shadow-xl">
+        <div class="flex items-center justify-between text-xs sm:text-sm font-semibold">
+          <!-- Player 1 Profile -->
+          <div class="flex items-center space-x-2">
+            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
+            <div>
+              <span id="hud-p1-name" class="text-white font-bold">You</span>
+              <div class="text-[11px] text-slate-400">Wins: <span id="hud-p1-wins" class="text-indigo-400 font-mono font-bold">0</span></div>
+            </div>
+          </div>
+
+          <!-- Match Status & Timer -->
+          <div class="flex flex-col items-center">
+            <span id="hud-timer" class="font-mono text-xl sm:text-2xl font-black text-amber-400 tracking-widest">00:00</span>
+            <span id="hud-round-info" class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Round 1</span>
+          </div>
+
+          <!-- Player 2 Profile -->
+          <div class="flex items-center space-x-2 text-right">
+            <div>
+              <span id="hud-p2-name" class="text-white font-bold">Opponent</span>
+              <div class="text-[11px] text-slate-400">Wins: <span id="hud-p2-wins" class="text-violet-400 font-mono font-bold">0</span></div>
+            </div>
+            <div class="w-2.5 h-2.5 rounded-full bg-violet-400"></div>
+          </div>
+        </div>
+
+        <!-- Progress Bars (Blind-play visualizer) -->
+        <div class="mt-3 grid grid-cols-2 gap-4">
+          <div>
+            <div class="flex justify-between text-[10px] text-slate-400 mb-1 font-mono">
+              <span>Your Progress</span>
+              <span id="p1-progress-pct">0%</span>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div id="p1-progress-bar" class="bg-indigo-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-[10px] text-slate-400 mb-1 font-mono">
+              <span>Opponent</span>
+              <span id="p2-progress-pct">0%</span>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div id="p2-progress-bar" class="bg-violet-500 h-full w-0 transition-all duration-300"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUDOKU BOARD -->
+      <div class="relative bg-slate-900 border-2 border-slate-600 rounded-xl shadow-2xl p-1 mb-4 select-none">
+        <div id="board" class="grid grid-cols-9 bg-slate-700 gap-[1px] w-[330px] h-[330px] sm:w-[420px] sm:h-[420px]">
+          <!-- 81 Cells are generated via JS -->
+        </div>
+      </div>
+
+      <!-- INPUT CONTROLS / NUMPAD -->
+      <div class="w-full max-w-sm space-y-3">
+        <div class="flex items-center justify-between px-2">
+          <button id="note-btn" onclick="toggleNotesMode()" class="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
+            <span>✏️ Pencil Mode:</span>
+            <span id="note-status" class="text-rose-400 font-bold">OFF</span>
+          </button>
+          <button onclick="eraseCell()" class="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300">
+            ⌫ Erase
+          </button>
+        </div>
+
+        <div class="grid grid-cols-9 gap-1 sm:gap-2">
+          <button onclick="inputNumber(1)" class="py-3 bg-slate-800 hover:bg-indigo-600 text-white font-mono font-bold rounded-lg text-lg transition">1</button>
+          <button onclick="inputNumber(2)" class="py-3 bg-slate-800 hover:bg-indigo-600 text-white font-mono font-bold rounded-lg text-lg transition">2</button>
+          <button onclick="inputNumber(3)" class="py-3 bg-slate-800 hover:bg-indigo-600 text-white font-mono font-bold rounded-lg text-lg transition">3</button>
+          <button onclick="inputNumber(4)" class="py-3 bg-slate-800 hover:bg-indigo-600 text-white font-mono font-bold rounded-lg text-lg transition">4</button>
+          <button onclick="inputNumber(5)" class="py-3 bg-slate-800 hover:bg-indigo-600 text-white font-mono font-bold rounded-lg text-lg transition">5</button>
+          <button onclick="inputNumber(6)" class="py-3 bg-slate-800 hover:bg-indigo-600 text-white font-mono font-bold rounded-lg text-lg transition">6</button>
+          <button onclick="inputNumber(7)" class="py-3 bg-slate-800 hover:bg-indigo-600 text-white font-mono font-bold rounded-lg text-lg transition">7</button>
+          <button onclick="inputNumber(8)" class="py-3 bg-slate-800 hover:bg-indigo-600 text-white font-mono font-bold rounded-lg text-lg transition">8</button>
+          <button onclick="inputNumber(9)" class="py-3 bg-slate-800 hover:bg-indigo-600 text-white font-mono font-bold rounded-lg text-lg transition">9</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VICTORY / ROUND MODAL -->
+    <div id="game-over-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+        <div id="modal-crown" class="text-5xl">🏆</div>
+        <h2 id="modal-title" class="text-2xl font-black text-white">Winner Announced!</h2>
+        <p id="modal-desc" class="text-sm text-slate-300">Player 1 solved the board first in 04:32!</p>
+
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-left space-y-2 text-xs font-mono">
+          <div class="flex justify-between">
+            <span class="text-slate-400">Total Rounds Played:</span>
+            <span id="stat-rounds" class="text-white font-bold">1</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Fastest Time:</span>
+            <span id="stat-best-time" class="text-emerald-400 font-bold">--:--</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">Tournament Standings:</span>
+            <span id="stat-standings" class="text-indigo-400 font-bold">0 - 0</span>
+          </div>
+        </div>
+
+        <button onclick="startNextRound()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl shadow-lg transition">
+          Next Round ➔
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="w-full text-center py-3 text-[11px] text-slate-600">
+    Synchronized Peer-to-Peer Sudoku Engine • GitHub + Vercel Ready
+  </footer>
+
+  <script>
+    // --- STATE MANAGEMENT ---
+    let peer = null;
+    let conn = null;
+    let isHost = false;
+    let myName = 'Player 1';
+    let opponentName = 'Player 2';
+    let myScore = 0;
+    let opponentScore = 0;
+    let currentRound = 1;
+    let fastestTimeSeconds = Infinity;
+
+    let timerInterval = null;
+    let elapsedSeconds = 0;
+    let notesMode = false;
+    let selectedCellIndex = null;
+
+    let initialBoard = Array(81).fill(0);
+    let solutionBoard = Array(81).fill(0);
+    let currentBoard = Array(81).fill(0);
+    let notes = Array(81).fill(null).map(() => new Set());
+
+    // --- SUDOKU GENERATION & SOLVER (Host Only) ---
+    function generateSudoku() {
+      // Base template puzzle for deterministic quick sync
+      const solved = [
+        5,3,4,6,7,8,9,1,2,
+        6,7,2,1,9,5,3,4,8,
+        1,9,8,3,4,2,5,6,7,
+        8,5,9,7,6,1,4,2,3,
+        4,2,6,8,5,3,7,9,1,
+        7,1,3,9,2,4,8,5,6,
+        9,6,1,5,3,7,2,8,4,
+        2,8,7,4,1,9,6,3,5,
+        3,4,5,2,8,6,1,7,9
+      ];
+
+      // Random digit substitution map
+      const digits = [1,2,3,4,5,6,7,8,9];
+      const shuffledDigits = [...digits].sort(() => Math.random() - 0.5);
+      const digitMap = {};
+      digits.forEach((d, i) => digitMap[d] = shuffledDigits[i]);
+
+      const newSolved = solved.map(n => digitMap[n]);
+      const puzzle = [...newSolved];
+
+      // Remove ~40 numbers to create a fair, fast-paced tournament puzzle
+      const indices = Array.from({length: 81}, (_, i) => i).sort(() => Math.random() - 0.5);
+      for (let i = 0; i < 40; i++) {
+        puzzle[indices[i]] = 0;
+      }
+
+      return { initial: puzzle, solution: newSolved };
+    }
+
+    // --- PEER-TO-PEER WEBRTC NETWORKING ---
+    function setupAsHost() {
+      myName = document.getElementById('player-name-input').value.trim() || 'Player 1';
+      isHost = true;
+      const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      peer = new Peer('sdk-' + roomCode);
+
+      peer.on('open', (id) => {
+        document.getElementById('display-room-code').innerText = roomCode;
+        document.getElementById('badge-room-code').innerText = roomCode;
+        document.getElementById('host-waiting-section').classList.remove('hidden');
+      });
+
+      peer.on('connection', (connection) => {
+        conn = connection;
+        setupConnectionHandlers();
+      });
+
+      peer.on('error', (err) => alert('Peer error: ' + err));
+    }
+
+    function showJoinInput() {
+      myName = document.getElementById('player-name-input').value.trim() || 'Player 2';
+      document.getElementById('join-section').classList.remove('hidden');
+    }
+
+    function joinGame() {
+      const code = document.getElementById('join-room-code').value.trim().toUpperCase();
+      if (!code) return alert('Please enter room code');
+
+      isHost = false;
+      peer = new Peer();
+
+      peer.on('open', () => {
+        conn = peer.connect('sdk-' + code);
+        document.getElementById('badge-room-code').innerText = code;
+        setupConnectionHandlers();
+      });
+
+      peer.on('error', (err) => alert('Connection failed: ' + err));
+    }
+
+    function setupConnectionHandlers() {
+      conn.on('open', () => {
+        // Exchange names
+        conn.send({ type: 'HANDSHAKE', name: myName });
+
+        if (isHost) {
+          const { initial, solution } = generateSudoku();
+          initialBoard = initial;
+          solutionBoard = solution;
+          conn.send({ type: 'START_MATCH', initial, solution, hostName: myName });
+          startMatch(initial, solution);
+        }
+      });
+
+      conn.on('data', (data) => {
+        if (data.type === 'HANDSHAKE') {
+          opponentName = data.name;
+          updateHUDNames();
+        } else if (data.type === 'START_MATCH') {
+          opponentName = data.hostName;
+          initialBoard = data.initial;
+          solutionBoard = data.solution;
+          updateHUDNames();
+          startMatch(data.initial, data.solution);
+        } else if (data.type === 'PROGRESS_UPDATE') {
+          updateOpponentProgress(data.percentage);
+        } else if (data.type === 'PLAYER_WON') {
+          handleGameOver(false, data.winnerName, data.timeStr);
+        } else if (data.type === 'NEXT_ROUND') {
+          initialBoard = data.initial;
+          solutionBoard = data.solution;
+          startMatch(data.initial, data.solution);
+        }
+      });
+    }
+
+    function updateHUDNames() {
+      document.getElementById('hud-p1-name').innerText = myName + ' (You)';
+      document.getElementById('hud-p2-name').innerText = opponentName;
+    }
+
+    function copyInviteLink() {
+      const code = document.getElementById('badge-room-code').innerText;
+      const url = window.location.origin + window.location.pathname + '?room=' + code;
+      navigator.clipboard.writeText(url).then(() => alert('Room link copied! Open on another device/browser.'));
+    }
+
+    // Auto-fill room code if present in URL
+    window.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const roomParam = params.get('room');
+      if (roomParam) {
+        document.getElementById('join-section').classList.remove('hidden');
+        document.getElementById('join-room-code').value = roomParam;
+      }
+    });
+
+    // --- GAME ENGINE ---
+    function startMatch(initial, solution) {
+      document.getElementById('lobby-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+      document.getElementById('room-badge').classList.remove('hidden');
+      document.getElementById('game-over-modal').classList.add('hidden');
+
+      currentBoard = [...initial];
+      notes = Array(81).fill(null).map(() => new Set());
+      selectedCellIndex = null;
+      elapsedSeconds = 0;
+
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        elapsedSeconds++;
+        const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
+        const secs = String(elapsedSeconds % 60).padStart(2, '0');
+        document.getElementById('hud-timer').innerText = `${mins}:${secs}`;
+      }, 1000);
+
+      renderBoard();
+      updateMyProgress();
+    }
+
+    function renderBoard() {
+      const boardEl = document.getElementById('board');
+      boardEl.innerHTML = '';
+
+      for (let i = 0; i < 81; i++) {
+        const cell = document.createElement('div');
+        const row = Math.floor(i / 9);
+        const col = i % 9;
+
+        cell.className = `sudoku-cell bg-slate-900 cursor-pointer font-mono font-bold text-base sm:text-xl ${
+          col === 2 || col === 5 ? 'thick-right' : ''
+        } ${row === 2 || row === 5 ? 'thick-bottom' : ''}`;
+
+        cell.dataset.index = i;
+        cell.onclick = () => selectCell(i);
+
+        if (initialBoard[i] !== 0) {
+          cell.innerText = initialBoard[i];
+          cell.classList.add('text-indigo-300', 'font-black', 'bg-slate-900/90');
+        } else if (currentBoard[i] !== 0) {
+          cell.innerText = currentBoard[i];
+          cell.classList.add('text-white');
+        } else {
+          // Render pencil notes
+          const noteContainer = document.createElement('div');
+          noteContainer.className = 'notes-grid';
+          for (let n = 1; n <= 9; n++) {
+            const span = document.createElement('span');
+            span.innerText = notes[i].has(n) ? n : '';
+            noteContainer.appendChild(span);
+          }
+          cell.appendChild(noteContainer);
+        }
+
+        boardEl.appendChild(cell);
+      }
+    }
+
+    function selectCell(index) {
+      selectedCellIndex = index;
+      document.querySelectorAll('.sudoku-cell').forEach((el, i) => {
+        el.classList.remove('bg-indigo-950', 'ring-2', 'ring-indigo-400');
+        if (i === index) {
+          el.classList.add('bg-indigo-950', 'ring-2', 'ring-indigo-400');
+        }
+      });
+    }
+
+    function toggleNotesMode() {
+      notesMode = !notesMode;
+      const statusEl = document.getElementById('note-status');
+      statusEl.innerText = notesMode ? 'ON' : 'OFF';
+      statusEl.className = notesMode ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
+    }
+
+    function inputNumber(num) {
+      if (selectedCellIndex === null) return;
+      if (initialBoard[selectedCellIndex] !== 0) return;
+
+      if (notesMode) {
+        if (notes[selectedCellIndex].has(num)) {
+          notes[selectedCellIndex].delete(num);
+        } else {
+          notes[selectedCellIndex].add(num);
+        }
+        currentBoard[selectedCellIndex] = 0;
+      } else {
+        currentBoard[selectedCellIndex] = num;
+        notes[selectedCellIndex].clear();
+      }
+
+      renderBoard();
+      selectCell(selectedCellIndex);
+      updateMyProgress();
+      checkWinCondition();
+    }
+
+    function eraseCell() {
+      if (selectedCellIndex === null) return;
+      if (initialBoard[selectedCellIndex] !== 0) return;
+
+      currentBoard[selectedCellIndex] = 0;
+      notes[selectedCellIndex].clear();
+      renderBoard();
+      selectCell(selectedCellIndex);
+      updateMyProgress();
+    }
+
+    function updateMyProgress() {
+      let filled = 0;
+      let totalEmpty = 0;
+      for (let i = 0; i < 81; i++) {
+        if (initialBoard[i] === 0) {
+          totalEmpty++;
+          if (currentBoard[i] !== 0) filled++;
+        }
+      }
+      const pct = Math.round((filled / totalEmpty) * 100);
+      document.getElementById('p1-progress-bar').style.width = pct + '%';
+      document.getElementById('p1-progress-pct').innerText = pct + '%';
+
+      if (conn && conn.open) {
+        conn.send({ type: 'PROGRESS_UPDATE', percentage: pct });
+      }
+    }
+
+    function updateOpponentProgress(pct) {
+      document.getElementById('p2-progress-bar').style.width = pct + '%';
+      document.getElementById('p2-progress-pct').innerText = pct + '%';
+    }
+
+    function checkWinCondition() {
+      for (let i = 0; i < 81; i++) {
+        if (currentBoard[i] !== solutionBoard[i]) return;
+      }
+
+      // Solved correctly!
+      clearInterval(timerInterval);
+      const timeStr = document.getElementById('hud-timer').innerText;
+      if (conn && conn.open) {
+        conn.send({ type: 'PLAYER_WON', winnerName: myName, timeStr });
+      }
+      handleGameOver(true, myName, timeStr);
+    }
+
+    function handleGameOver(didIWin, winnerName, timeStr) {
+      clearInterval(timerInterval);
+      const modal = document.getElementById('game-over-modal');
+      const title = document.getElementById('modal-title');
+      const desc = document.getElementById('modal-desc');
+
+      if (didIWin) {
+        myScore++;
+        title.innerText = 'Victory! You Won!';
+        title.className = 'text-2xl font-black text-emerald-400';
+        desc.innerText = `You completed the puzzle first in ${timeStr}!`;
+      } else {
+        opponentScore++;
+        title.innerText = 'Defeat! Opponent Won!';
+        title.className = 'text-2xl font-black text-rose-400';
+        desc.innerText = `${winnerName} completed the puzzle first in ${timeStr}!`;
+      }
+
+      if (elapsedSeconds < fastestTimeSeconds) {
+        fastestTimeSeconds = elapsedSeconds;
+        document.getElementById('stat-best-time').innerText = timeStr;
+      }
+
+      document.getElementById('hud-p1-wins').innerText = myScore;
+      document.getElementById('hud-p2-wins').innerText = opponentScore;
+      document.getElementById('stat-rounds').innerText = currentRound;
+      document.getElementById('stat-standings').innerText = `${myScore} - ${opponentScore}`;
+
+      modal.classList.remove('hidden');
+    }
+
+    function startNextRound() {
+      currentRound++;
+      document.getElementById('hud-round-info').innerText = `Round ${currentRound}`;
+
+      if (isHost) {
+        const { initial, solution } = generateSudoku();
+        initialBoard = initial;
+        solutionBoard = solution;
+        conn.send({ type: 'NEXT_ROUND', initial, solution });
+        startMatch(initial, solution);
+      } else {
+        alert('Waiting for the host to start the next round...');
+      }
+    }
+
+    // Keyboard support
+    window.addEventListener('keydown', (e) => {
+      if (document.getElementById('game-screen').classList.contains('hidden')) return;
+
+      if (e.key >= '1' && e.key <= '9') {
+        inputNumber(parseInt(e.key));
+      } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        eraseCell();
+      } else if (e.key === 'n' || e.key === 'N') {
+        toggleNotesMode();
+      } else if (selectedCellIndex !== null) {
+        let row = Math.floor(selectedCellIndex / 9);
+        let col = selectedCellIndex % 9;
+        if (e.key === 'ArrowUp' && row > 0) selectCell((row - 1) * 9 + col);
+        if (e.key === 'ArrowDown' && row < 8) selectCell((row + 1) * 9 + col);
+        if (e.key === 'ArrowLeft' && col > 0) selectCell(row * 9 + (col - 1));
+        if (e.key === 'ArrowRight' && col < 8) selectCell(row * 9 + (col + 1));
+      }
+    });
+  </script>
+</body>
+</html>
