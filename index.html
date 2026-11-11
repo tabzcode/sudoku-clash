@@ -16,9 +16,6 @@
           fontFamily: {
             sans: ['"Plus Jakarta Sans"', 'sans-serif'],
             mono: ['"JetBrains Mono"', 'monospace']
-          },
-          colors: {
-            brand: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }
           }
         }
       }
@@ -83,15 +80,15 @@
       <div class="space-y-4">
         <div>
           <label class="block text-xs font-semibold uppercase text-slate-400 tracking-wider mb-1">Your Name</label>
-          <input type="text" id="player-name-input" maxlength="14" placeholder="Enter your nickname..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+          <input type="text" id="player-name-input" maxlength="14" placeholder="Enter your name..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
         </div>
 
         <div class="grid grid-cols-2 gap-3 pt-2">
-          <button onclick="setupAsHost()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-600/30 transition flex flex-col items-center justify-center">
+          <button id="btn-host" onclick="setupAsHost()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-600/30 transition flex flex-col items-center justify-center">
             <span class="text-base font-bold">Host Match</span>
             <span class="text-[11px] text-indigo-200 font-normal">Create new room</span>
           </button>
-          <button onclick="showJoinInput()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 px-4 rounded-xl border border-slate-700 transition flex flex-col items-center justify-center">
+          <button id="btn-show-join" onclick="showJoinInput()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 px-4 rounded-xl border border-slate-700 transition flex flex-col items-center justify-center">
             <span class="text-base font-bold">Join Game</span>
             <span class="text-[11px] text-slate-400 font-normal">Enter room code</span>
           </button>
@@ -102,19 +99,29 @@
           <label class="block text-xs font-semibold uppercase text-slate-400 tracking-wider mb-1">Enter Room Code</label>
           <div class="flex space-x-2">
             <input type="text" id="join-room-code" uppercase maxlength="6" placeholder="e.g. 8K2M19" class="w-full uppercase font-mono tracking-wider bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
-            <button onclick="joinGame()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl transition">Connect</button>
+            <button id="btn-connect" onclick="joinGame()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl transition">Connect</button>
           </div>
         </div>
 
-        <!-- Host Waiting Modal -->
+        <!-- Host Waiting Section -->
         <div id="host-waiting-section" class="hidden pt-4 border-t border-slate-800 text-center space-y-3">
           <p class="text-xs text-slate-400">Share this Room Code with your sibling:</p>
           <div class="inline-flex items-center space-x-2 bg-slate-950 border border-indigo-500/40 px-4 py-2 rounded-xl">
             <span id="display-room-code" class="text-2xl font-mono font-black text-indigo-400 tracking-widest">------</span>
             <button onclick="copyInviteLink()" class="p-1 hover:bg-slate-800 rounded text-slate-300" title="Copy URL">📋</button>
           </div>
-          <p class="text-xs text-amber-400/90 animate-pulse font-mono">Waiting for second player to connect...</p>
         </div>
+
+        <!-- Live Network Status / Debug Pill -->
+        <div id="status-box" class="pt-2 text-center text-xs font-mono text-slate-400 flex items-center justify-center space-x-2">
+          <span id="status-dot" class="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>
+          <span id="status-text">Ready to connect</span>
+        </div>
+
+        <!-- Manual Start Button (Host failsafe) -->
+        <button id="manual-start-btn" onclick="hostInitiateGame()" class="hidden w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition">
+          🚀 Both Connected! Start Match Now
+        </button>
       </div>
     </div>
 
@@ -175,7 +182,7 @@
       <!-- SUDOKU BOARD -->
       <div class="relative bg-slate-900 border-2 border-slate-600 rounded-xl shadow-2xl p-1 mb-4 select-none">
         <div id="board" class="grid grid-cols-9 bg-slate-700 gap-[1px] w-[330px] h-[330px] sm:w-[420px] sm:h-[420px]">
-          <!-- 81 Cells are generated via JS -->
+          <!-- 81 Cells -->
         </div>
       </div>
 
@@ -210,7 +217,7 @@
       <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
         <div id="modal-crown" class="text-5xl">🏆</div>
         <h2 id="modal-title" class="text-2xl font-black text-white">Winner Announced!</h2>
-        <p id="modal-desc" class="text-sm text-slate-300">Player 1 solved the board first in 04:32!</p>
+        <p id="modal-desc" class="text-sm text-slate-300">Player solved the board first!</p>
 
         <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-left space-y-2 text-xs font-mono">
           <div class="flex justify-between">
@@ -236,7 +243,7 @@
   </main>
 
   <footer class="w-full text-center py-3 text-[11px] text-slate-600">
-    Synchronized Peer-to-Peer Sudoku Engine • GitHub + Vercel Ready
+    Peer-to-Peer Sudoku Engine • GitHub + Vercel Ready
   </footer>
 
   <script>
@@ -261,9 +268,35 @@
     let currentBoard = Array(81).fill(0);
     let notes = Array(81).fill(null).map(() => new Set());
 
-    // --- SUDOKU GENERATION & SOLVER (Host Only) ---
+    // Public STUN servers to guarantee WebRTC works through mobile data & routers
+    const PEER_CONFIG = {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' }
+        ]
+      }
+    };
+
+    function setStatus(text, type = 'info') {
+      const dot = document.getElementById('status-dot');
+      const label = document.getElementById('status-text');
+      label.innerText = text;
+
+      if (type === 'loading') {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block';
+      } else if (type === 'success') {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400 inline-block';
+      } else if (type === 'error') {
+        dot.className = 'w-2 h-2 rounded-full bg-rose-500 inline-block';
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-slate-600 inline-block';
+      }
+    }
+
+    // --- SUDOKU GENERATOR ---
     function generateSudoku() {
-      // Base template puzzle for deterministic quick sync
       const solved = [
         5,3,4,6,7,8,9,1,2,
         6,7,2,1,9,5,3,4,8,
@@ -276,44 +309,58 @@
         3,4,5,2,8,6,1,7,9
       ];
 
-      // Random digit substitution map
       const digits = [1,2,3,4,5,6,7,8,9];
-      const shuffledDigits = [...digits].sort(() => Math.random() - 0.5);
-      const digitMap = {};
-      digits.forEach((d, i) => digitMap[d] = shuffledDigits[i]);
+      const shuffled = [...digits].sort(() => Math.random() - 0.5);
+      const map = {};
+      digits.forEach((d, i) => map[d] = shuffled[i]);
 
-      const newSolved = solved.map(n => digitMap[n]);
+      const newSolved = solved.map(n => map[n]);
       const puzzle = [...newSolved];
 
-      // Remove ~40 numbers to create a fair, fast-paced tournament puzzle
+      // Remove ~38 numbers for balanced competitive speed
       const indices = Array.from({length: 81}, (_, i) => i).sort(() => Math.random() - 0.5);
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 38; i++) {
         puzzle[indices[i]] = 0;
       }
 
       return { initial: puzzle, solution: newSolved };
     }
 
-    // --- PEER-TO-PEER WEBRTC NETWORKING ---
+    // --- PEER SETUP ---
     function setupAsHost() {
       myName = document.getElementById('player-name-input').value.trim() || 'Player 1';
       isHost = true;
-      const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      setStatus('Creating room on relay...', 'loading');
 
-      peer = new Peer('sdk-' + roomCode);
+      // 5-digit clean alphanumeric room id
+      const cleanRoomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+      const peerId = 'sdk2-' + cleanRoomCode;
 
-      peer.on('open', (id) => {
-        document.getElementById('display-room-code').innerText = roomCode;
-        document.getElementById('badge-room-code').innerText = roomCode;
+      try {
+        if (peer) peer.destroy();
+      } catch(e){}
+
+      peer = new Peer(peerId, PEER_CONFIG);
+
+      peer.on('open', () => {
+        document.getElementById('display-room-code').innerText = cleanRoomCode;
+        document.getElementById('badge-room-code').innerText = cleanRoomCode;
         document.getElementById('host-waiting-section').classList.remove('hidden');
+        document.getElementById('btn-host').disabled = true;
+        document.getElementById('btn-host').classList.add('opacity-50');
+        setStatus(`Room ${cleanRoomCode} active. Waiting for sibling...`, 'loading');
       });
 
       peer.on('connection', (connection) => {
         conn = connection;
-        setupConnectionHandlers();
+        setStatus('Player connected! Exchanging data...', 'loading');
+        setupDataChannel();
       });
 
-      peer.on('error', (err) => alert('Peer error: ' + err));
+      peer.on('error', (err) => {
+        console.error(err);
+        setStatus('Room error: ' + err.type, 'error');
+      });
     }
 
     function showJoinInput() {
@@ -322,55 +369,93 @@
     }
 
     function joinGame() {
-      const code = document.getElementById('join-room-code').value.trim().toUpperCase();
-      if (!code) return alert('Please enter room code');
+      myName = document.getElementById('player-name-input').value.trim() || 'Player 2';
+      const rawCode = document.getElementById('join-room-code').value.trim().toUpperCase();
+      if (!rawCode) return alert('Please enter room code');
 
       isHost = false;
-      peer = new Peer();
+      setStatus('Connecting to host room...', 'loading');
+
+      try {
+        if (peer) peer.destroy();
+      } catch(e){}
+
+      peer = new Peer(PEER_CONFIG);
 
       peer.on('open', () => {
-        conn = peer.connect('sdk-' + code);
-        document.getElementById('badge-room-code').innerText = code;
-        setupConnectionHandlers();
+        const targetId = 'sdk2-' + rawCode;
+        document.getElementById('badge-room-code').innerText = rawCode;
+        conn = peer.connect(targetId, { reliable: true });
+
+        conn.on('open', () => {
+          setStatus('Connected! Syncing puzzle...', 'loading');
+          setupDataChannel();
+          // Send handshake immediately
+          conn.send({ type: 'GREETING', name: myName });
+        });
+
+        conn.on('error', (err) => {
+          setStatus('Connection error. Check code.', 'error');
+        });
       });
 
-      peer.on('error', (err) => alert('Connection failed: ' + err));
+      peer.on('error', (err) => {
+        console.error(err);
+        setStatus('Failed to reach room: ' + err.type, 'error');
+      });
     }
 
-    function setupConnectionHandlers() {
-      conn.on('open', () => {
-        // Exchange names
-        conn.send({ type: 'HANDSHAKE', name: myName });
-
-        if (isHost) {
-          const { initial, solution } = generateSudoku();
-          initialBoard = initial;
-          solutionBoard = solution;
-          conn.send({ type: 'START_MATCH', initial, solution, hostName: myName });
-          startMatch(initial, solution);
-        }
-      });
-
+    function setupDataChannel() {
       conn.on('data', (data) => {
-        if (data.type === 'HANDSHAKE') {
+        if (data.type === 'GREETING') {
           opponentName = data.name;
           updateHUDNames();
-        } else if (data.type === 'START_MATCH') {
+
+          if (isHost) {
+            document.getElementById('manual-start-btn').classList.remove('hidden');
+            hostInitiateGame();
+          } else {
+            conn.send({ type: 'GREETING_ACK', name: myName });
+          }
+        } else if (data.type === 'GREETING_ACK') {
+          opponentName = data.name;
+          updateHUDNames();
+        } else if (data.type === 'START_PUZZLE') {
           opponentName = data.hostName;
           initialBoard = data.initial;
           solutionBoard = data.solution;
           updateHUDNames();
-          startMatch(data.initial, data.solution);
-        } else if (data.type === 'PROGRESS_UPDATE') {
+          launchGameBoard();
+        } else if (data.type === 'PROGRESS_SYNC') {
           updateOpponentProgress(data.percentage);
-        } else if (data.type === 'PLAYER_WON') {
+        } else if (data.type === 'GAME_OVER') {
           handleGameOver(false, data.winnerName, data.timeStr);
-        } else if (data.type === 'NEXT_ROUND') {
+        } else if (data.type === 'NEXT_PUZZLE') {
           initialBoard = data.initial;
           solutionBoard = data.solution;
-          startMatch(data.initial, data.solution);
+          launchGameBoard();
         }
       });
+    }
+
+    function hostInitiateGame() {
+      if (!conn || !conn.open) {
+        setStatus('Waiting for connection to stabilize...', 'loading');
+        return;
+      }
+      setStatus('Starting match...', 'success');
+      const { initial, solution } = generateSudoku();
+      initialBoard = initial;
+      solutionBoard = solution;
+
+      conn.send({
+        type: 'START_PUZZLE',
+        initial: initial,
+        solution: solution,
+        hostName: myName
+      });
+
+      launchGameBoard();
     }
 
     function updateHUDNames() {
@@ -381,10 +466,10 @@
     function copyInviteLink() {
       const code = document.getElementById('badge-room-code').innerText;
       const url = window.location.origin + window.location.pathname + '?room=' + code;
-      navigator.clipboard.writeText(url).then(() => alert('Room link copied! Open on another device/browser.'));
+      navigator.clipboard.writeText(url).then(() => alert('Link copied! Open it on your sibling\'s device.'));
     }
 
-    // Auto-fill room code if present in URL
+    // Auto-fill room code from query params
     window.addEventListener('DOMContentLoaded', () => {
       const params = new URLSearchParams(window.location.search);
       const roomParam = params.get('room');
@@ -395,13 +480,13 @@
     });
 
     // --- GAME ENGINE ---
-    function startMatch(initial, solution) {
+    function launchGameBoard() {
       document.getElementById('lobby-screen').classList.add('hidden');
       document.getElementById('game-screen').classList.remove('hidden');
       document.getElementById('room-badge').classList.remove('hidden');
       document.getElementById('game-over-modal').classList.add('hidden');
 
-      currentBoard = [...initial];
+      currentBoard = [...initialBoard];
       notes = Array(81).fill(null).map(() => new Set());
       selectedCellIndex = null;
       elapsedSeconds = 0;
@@ -441,7 +526,6 @@
           cell.innerText = currentBoard[i];
           cell.classList.add('text-white');
         } else {
-          // Render pencil notes
           const noteContainer = document.createElement('div');
           noteContainer.className = 'notes-grid';
           for (let n = 1; n <= 9; n++) {
@@ -520,7 +604,7 @@
       document.getElementById('p1-progress-pct').innerText = pct + '%';
 
       if (conn && conn.open) {
-        conn.send({ type: 'PROGRESS_UPDATE', percentage: pct });
+        conn.send({ type: 'PROGRESS_SYNC', percentage: pct });
       }
     }
 
@@ -534,11 +618,11 @@
         if (currentBoard[i] !== solutionBoard[i]) return;
       }
 
-      // Solved correctly!
+      // Solved
       clearInterval(timerInterval);
       const timeStr = document.getElementById('hud-timer').innerText;
       if (conn && conn.open) {
-        conn.send({ type: 'PLAYER_WON', winnerName: myName, timeStr });
+        conn.send({ type: 'GAME_OVER', winnerName: myName, timeStr });
       }
       handleGameOver(true, myName, timeStr);
     }
@@ -582,14 +666,14 @@
         const { initial, solution } = generateSudoku();
         initialBoard = initial;
         solutionBoard = solution;
-        conn.send({ type: 'NEXT_ROUND', initial, solution });
-        startMatch(initial, solution);
+        conn.send({ type: 'NEXT_PUZZLE', initial, solution });
+        launchGameBoard();
       } else {
-        alert('Waiting for the host to start the next round...');
+        alert('Waiting for the host to launch next round...');
       }
     }
 
-    // Keyboard support
+    // Keyboard controls
     window.addEventListener('keydown', (e) => {
       if (document.getElementById('game-screen').classList.contains('hidden')) return;
 
